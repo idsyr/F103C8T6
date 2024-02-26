@@ -1,0 +1,89 @@
+#include "plib/stm32f1xx_ll_usart.h"
+#include "plib/stm32f1xx_ll_spi.h"
+#include "plib/stm32f1xx_ll_rcc.h"
+#include "plib/stm32f1xx_ll_system.h"
+#include "plib/stm32f1xx_ll_bus.h"
+#include "plib/stm32f1xx_ll_gpio.h"
+//#include "lib/xprintf.h"
+
+void usart_gpio_init(){
+    LL_AHB1_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA);
+
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
+    //LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_9, LL_GPIO_AF_1);
+    LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_HIGH);
+
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_10, LL_GPIO_MODE_ALTERNATE);
+    //LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_10, LL_GPIO_AF_1);
+    LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_10, LL_GPIO_SPEED_FREQ_HIGH);
+
+    LL_GPIO_AF_EnableRemap_USART1();
+
+}
+
+void usart_clock_init(){
+    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_USART1);
+    //LL_RCC_SetUSARTClockSource(LL_RCC_USART1_CLKSOURCE_PCLK1);
+    
+}
+
+void usart_channel_init(){
+    LL_USART_SetTransferDirection(USART1, LL_USART_DIRECTION_TX_RX); //duo
+    LL_USART_SetParity(USART1, LL_USART_PARITY_NONE);
+    LL_USART_SetDataWidth(USART1, LL_USART_DATAWIDTH_8B);
+    LL_USART_SetStopBitsLength(USART1, LL_USART_STOPBITS_1);
+    //LL_USART_SetTransferBitOrder(USART1, LL_SPI_LSB_FIRST);
+    LL_USART_SetBaudRate(USART1, SystemCoreClock, /*LL_USART_OVERSAMPLING_16,*/ 9600);
+    LL_USART_EnableIT_IDLE(USART1);
+    LL_USART_EnableIT_RXNE(USART1);
+}
+
+void usart_nvic_init(){
+    NVIC_SetPriority(USART1_IRQn, 0);
+    NVIC_EnableIRQ(USART1_IRQn);
+}
+
+void usart_init(){
+    usart_gpio_init();
+    usart_clock_init();
+    usart_channel_init();
+    //usart_nvic_init();
+    LL_USART_Enable(USART1);
+
+    #ifdef TEACK_REACK_FOUND
+    while(!(LL_USART_IsActiveFlag_TEACK(USART1) && 
+            LL_USART_IsActiveFlag_REACK(USART1)));
+    #endif
+}
+
+void usart_putc(char c){
+    while(!LL_USART_IsActiveFlag_TXE(USART1));
+    LL_USART_TransmitData8(USART1, c);
+    while(!LL_USART_IsActiveFlag_TC(USART1));
+}
+
+char usart_getc(){
+    while(!LL_USART_IsActiveFlag_RXNE(USART1));
+    return LL_USART_ReceiveData8(USART1);
+}
+
+
+//void xprintf_init(void){
+//    xdev_out(usart_putc);
+//    xdev_in(usart_getc);
+//}
+
+
+void USART1_IRQHandler(void){
+    if(LL_USART_IsActiveFlag_RXNE(USART1)){
+        //xprintf("get sym");
+        usart_putc("g");
+        //LL_USART_ReceiveData8(USART1);
+    }
+    if(LL_USART_IsActiveFlag_IDLE(USART1)){
+        //
+        usart_putc("d");
+        //xprintf("get end"); 
+    }
+}
+
